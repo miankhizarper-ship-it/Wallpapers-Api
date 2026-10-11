@@ -17,6 +17,11 @@ app.use(express.json());
 const limiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 100 });
 app.use(limiter);
 
+// Health Check
+app.get('/', (req, res) => {
+    res.json({ message: '4k-wallpapers API is running' });
+});
+
 const getProvider = (req) => {
     const providerName = req.query.provider;
     if (!providerName) throw new Error('Provider is mandatory. Use ?provider=4kwallpapers or ?provider=wallpaperaccess');

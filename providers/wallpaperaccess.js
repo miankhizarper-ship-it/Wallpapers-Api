@@ -1,16 +1,12 @@
-const puppeteer = require('puppeteer');
-
-// Launch browser once to keep it running for better performance
-let browser = null;
-
 async function getBrowser() {
-    if (!browser) {
-        browser = await puppeteer.launch({ 
+    const puppeteer = require('puppeteer');
+    if (!global.__browser) {
+        global.__browser = await puppeteer.launch({ 
             headless: "new",
             args: ['--no-sandbox', '--disable-setuid-sandbox'] 
         });
     }
-    return browser;
+    return global.__browser;
 }
 
 async function getList(slug) {
@@ -24,7 +20,6 @@ async function getList(slug) {
 
         const wallpapers = await page.evaluate(() => {
             const items = [];
-            // Target the collection thumbnails as seen in your provided source
             document.querySelectorAll('.collection_thumb').forEach(el => {
                 const a = el.querySelector('a');
                 const img = el.querySelector('img');
@@ -60,7 +55,6 @@ async function getDetails(slug) {
         
         const details = await page.evaluate(() => {
             const title = document.querySelector('h1')?.innerText;
-            // Adjust this selector based on actual inspection of the detail page
             const downloadLink = document.querySelector('.download-button')?.getAttribute('href');
             
             return {
