@@ -45,6 +45,16 @@ app.get('/api/wallpapers', async (req, res) => {
     } catch (e) { res.status(400).json({ error: e.message }); }
 });
 
+app.get('/api/search', async (req, res) => {
+    try {
+        const provider = getProvider(req);
+        const { q, page = 1 } = req.query;
+        if (!q) throw new Error('Search query is mandatory. Use ?q={your-search-term}');
+        if (typeof provider.search !== 'function') throw new Error('Search is not supported by this provider');
+        res.json(await provider.search(q, parseInt(page, 10) || 1));
+    } catch (e) { res.status(400).json({ error: e.message }); }
+});
+
 app.get('/api/category/:slug', async (req, res) => {
     try {
         const provider = getProvider(req);

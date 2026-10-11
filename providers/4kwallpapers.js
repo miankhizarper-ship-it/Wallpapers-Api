@@ -36,6 +36,24 @@ async function getList(url) {
     return wallpapers;
 }
 
+// Search results page uses the exact same .wallpapers__item markup as listings,
+// so we can reuse getList.
+// Page 1:   /search/?q={query}
+// Page 2+:  /search/{query}?page={n}   (matches the site's own infinite-scroll logic,
+//            which rewrites "?q=x&page=2" into "/search/x?page=2")
+async function search(query, page = 1) {
+    if (!query || !query.trim()) throw new Error('Search query is required');
+
+    // The site uses hyphenated slugs for multi-word queries (e.g. "anime girl" -> "anime-girl")
+    const term = encodeURIComponent(query.trim().replace(/\s+/g, '-'));
+
+    const url = page > 1
+        ? `${BASE_URL}/search/${term}?page=${page}`
+        : `${BASE_URL}/search/?q=${term}`;
+
+    return getList(url);
+}
+
 async function getDetails(url) {
     try {
         const { data } = await axios.get(url.startsWith('http') ? url : `${BASE_URL}${url}`);
@@ -76,4 +94,4 @@ async function getDetails(url) {
     }
 }
 
-module.exports = { getCategories, getList, getDetails };
+module.exports = { getCategories, getList, getDetails, search };
