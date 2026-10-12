@@ -84,10 +84,21 @@ async function search(query, page = 1) {
 }
 
 async function getDetails(url) {
+    // Soft-404 guard: without the ".html" suffix the site answers 200 with the
+    // *category* page instead of the wallpaper. Always use the canonical URL.
+    if (!url.endsWith('.html')) url = `${url.replace(/\/+$/, '')}.html`;
+
     try {
         const { data } = await axios.get(url.startsWith('http') ? url : `${BASE_URL}${url}`);
         const $ = cheerio.load(data);
-        
+
+        // Real detail pages always render the resolution picker
+        if (!$('.wallpaper-resolutions').length) {
+            const err = new Error(`Wallpaper not found: ${url}`);
+            err.statusCode = 404;
+            throw err;
+        }
+
         // Extracting details
         const title = $('h1').text();
         const description = $('.wall-intro').text();
@@ -118,6 +129,11 @@ async function getDetails(url) {
             tags
         };
     } catch (e) {
+        // Axios 404 (unknown wallpaper) -> friendly message + 404 status
+        if (!e.statusCode && e.response && e.response.status === 404) {
+            e.statusCode = 404;
+            e.message = `Wallpaper not found: ${url}`;
+        }
         console.error('4KWallpapers Detail Scraper Error:', e.message);
         throw e;
     }

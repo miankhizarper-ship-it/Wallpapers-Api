@@ -14,7 +14,13 @@ app.use(cors({ exposedHeaders: ['X-Total-Pages'] }));
 app.use(morgan('dev'));
 app.use(express.json());
 
-const limiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 100 });
+const limiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 100,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { error: 'Too many requests, please try again later.' }
+});
 app.use(limiter);
 
 // Health Check
@@ -49,12 +55,16 @@ const sendList = (res, wallpapers) => {
     res.json(wallpapers);
 };
 
+// Errors carry an optional statusCode (e.g. 404 for "wallpaper not found");
+// validation problems fall back to 400.
+const sendError = (res, e) => res.status(e.statusCode || 400).json({ error: e.message });
+
 // Routes are registered strictly before listen
 app.get('/api/categories', async (req, res) => {
     try {
         const provider = getProvider(req);
         res.json(await provider.getCategories());
-    } catch (e) { res.status(400).json({ error: e.message }); }
+    } catch (e) { sendError(res, e); }
 });
 
 app.get('/api/wallpapers', async (req, res) => {
@@ -63,17 +73,20 @@ app.get('/api/wallpapers', async (req, res) => {
         const isWA = req.query.provider === 'wallpaperaccess';
         const url = isWA ? (req.query.slug || '') : buildPageUrl(req.query.slug || '', req.query.page);
         sendList(res, await provider.getList(url));
-    } catch (e) { res.status(400).json({ error: e.message }); }
+    } catch (e) { sendError(res, e); }
 });
 
-app.get('/api/search', async (req, res) => {
+// Search accepts both styles:
+//   /api/search/naruto?provider=4kwallpapers&page=2   (path style)
+//   /api/search?provider=4kwallpapers&q=naruto&page=2 (query style)
+app.get(['/api/search', '/api/search/:query'], async (req, res) => {
     try {
         const provider = getProvider(req);
-        const { q, page = 1 } = req.query;
-        if (!q) throw new Error('Search query is mandatory. Use ?q={your-search-term}');
+        const q = req.params.query || req.query.q;
+        if (!q) throw new Error('Search query is mandatory. Use /api/search/{query} or ?q={query}');
         if (typeof provider.search !== 'function') throw new Error('Search is not supported by this provider');
-        sendList(res, await provider.search(q, parseInt(page, 10) || 1));
-    } catch (e) { res.status(400).json({ error: e.message }); }
+        sendList(res, await provider.search(q, parseInt(req.query.page, 10) || 1));
+    } catch (e) { sendError(res, e); }
 });
 
 app.get('/api/category/:slug', async (req, res) => {
@@ -83,7 +96,7 @@ app.get('/api/category/:slug', async (req, res) => {
         const isWA = req.query.provider === 'wallpaperaccess';
         const url = isWA ? `/cat/${slug}` : buildPageUrl(`/${slug}`, req.query.page);
         sendList(res, await provider.getList(url));
-    } catch (e) { res.status(400).json({ error: e.message }); }
+    } catch (e) { sendError(res, e); }
 });
 
 app.get('/api/wallpaper/:category/:slug', async (req, res) => {
@@ -92,9 +105,10 @@ app.get('/api/wallpaper/:category/:slug', async (req, res) => {
         const { category, slug } = req.params;
         const url = (req.query.provider === 'wallpaperaccess') ? `/${slug}` : `/${category}/${slug}`;
         res.json(await provider.getDetails(url));
-    } catch (e) { res.status(400).json({ error: e.message }); }
+    } catch (e) { sendError(res, e); }
 });
 
 app.listen(PORT, () => {
     console.log(`Server running on http://localhost:${PORT}`);
 });
+
